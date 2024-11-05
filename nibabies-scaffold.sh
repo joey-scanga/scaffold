@@ -5,15 +5,17 @@ if [[ -z $NIBABIES_SCAFFOLD_SHARE ]]; then
   mkdir -p $NIBABIES_SCAFFOLD_SHARE
   export NIBABIES_SCAFFOLD_HISTORY="${NIBABIES_SCAFFOLD_SHARE}/history.txt"
   touch $NIBABIES_SCAFFOLD_HISTORY
+  export NIBABIES_GET_HIST_LINES="${NIBABIES_SCAFFOLD_SHARE}/get_history_lines.py"
 fi
 
 PARAMS=""
 
 read -r -d '' usage <<- EOM
-	usage: $0 [-h] [ --hist | --history ] [ --clear_history ]
+	usage: $0 [-h][ --hist | --history ][ --longhist | --long_history ][ --clear_history ]
 
 	-h: display help
-	--hist, --history: display nibabies call history
+	--hist, --history: display the 5 most recent Nibabies calls
+	--longhist, --long_history: display all Nibabies calls in less
     --clear_history: clears history file
 EOM
 
@@ -25,6 +27,11 @@ while (( "$#" )); do
       shift
       ;;
     --hist|--history)
+      $NIBABIES_GET_HIST_LINES $NIBABIES_SCAFFOLD_HISTORY
+      exit 0
+      shift
+      ;;
+    --longhist|--long_history)
       less +G $NIBABIES_SCAFFOLD_HISTORY
       exit 0
       shift
