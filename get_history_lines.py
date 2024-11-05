@@ -4,7 +4,6 @@ import re
 import argparse
 import subprocess
 import tempfile
-import pdb
 
 def get_parser():
     parser = argparse.ArgumentParser()
@@ -43,7 +42,6 @@ def main():
     else:
         lines_to_print = lines
     lines_to_print = [str.encode(l) for l in lines_to_print]
-    # pdb.set_trace()
     open_less_on_tempfile(lines_to_print)
 
 main()
