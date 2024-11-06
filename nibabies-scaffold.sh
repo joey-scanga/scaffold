@@ -31,12 +31,12 @@ while (( "$#" )); do
       exit 0
       shift
       ;;
-    --longhist|--long_history)
+    --longhist|--long-history)
       less +G $NIBABIES_SCAFFOLD_HISTORY
       exit 0
       shift
       ;;
-    --clear_history)
+    --clear-history)
       rm $NIBABIES_SCAFFOLD_HISTORY
       touch $NIBABIES_SCAFFOLD_HISTORY
       echo "History file at $NIBABIES_SCAFFOLD_HISTORY cleared."
@@ -54,7 +54,6 @@ while (( "$#" )); do
   esac
 done # set positional arguments in their proper place
 eval set -- "$PARAMS"
-
 
 if [[ -z $NIBABIES_SCAFFOLD_SHARE ]]; then
     export NIBABIES_SCAFFOLD_SHARE="$(realpath ~/.local/share/nibabies-scaffold)"
