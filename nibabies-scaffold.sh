@@ -120,7 +120,7 @@ while IFS= read -r line; do
     fi
 done < "$command_file"
 
-shell_command="${shell_command//[[:space:]]+/ }"
+shell_command="${shell_command//[[:space:]]+/ }" # remove spaces of len>1
 echo "$shell_command"
 eval "$shell_command"
 
