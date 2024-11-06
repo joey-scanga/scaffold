@@ -10,13 +10,18 @@ fi
 
 PARAMS=""
 
-read -r -d '' usage <<- EOM
-	usage: $0 [-h][ --hist | --history ][ --longhist | --long_history ][ --clear_history ]
+read -r -d '' usage <<EOM
+usage: $0 [-h]
+[ --hist | --history ]
+[ --longhist | --long_history ]
+[ --clear_history ]
+[ -e | --edit-previous-run RUN_NUMBER ]
 
-	-h: display help
-	--hist, --history: display the 5 most recent Nibabies calls
-	--longhist, --long_history: display all Nibabies calls in less
-    --clear_history: clears history file
+-h: display help
+--hist, --history: display the 5 most recent Nibabies calls
+--longhist, --long_history: display all Nibabies calls in less
+--clear_history: clears history file
+-e, --edit-previous-run: use a previous Nibabies run as an editable scaffold. You can get the run number by running with the --hist option.
 EOM
 
 while (( "$#" )); do
@@ -25,6 +30,15 @@ while (( "$#" )); do
       echo "$usage"
       exit 0
       shift
+      ;;
+    -e|--edit-previous-run)
+      if [ -n "$2" ] && [ ${2:0:1} != "-" ]; then
+        EDIT_PREVIOUS_RUN=$2
+        shift 2
+      else
+        echo "Error: Argument for $1 is missing" >&2
+        exit 1
+      fi
       ;;
     --hist|--history)
       $NIBABIES_GET_HIST_LINES $NIBABIES_SCAFFOLD_HISTORY
@@ -75,8 +89,18 @@ if [[ -z $NIBABIES_SCAFFOLD_STATE ]]; then
     mkdir -p ${NIBABIES_SCAFFOLD_STATE}
 fi
 
+
 command_file="${NIBABIES_SCAFFOLD_STATE}/command_$(date +%s)"
-cp $NIBABIES_SCAFFOLD_TXT $command_file
+if [[ -z "$EDIT_PREVIOUS_RUN" ]]; then
+    EDIT_PREVIOUS_RUN=0
+fi
+
+if (( $EDIT_PREVIOUS_RUN >= 1 )); then # Use a previous run as the scaffold
+    start_line=$(python3 -c "print(3 * $EDIT_PREVIOUS_RUN)")
+    cp <(awk NF $NIBABIES_SCAFFOLD_HISTORY | tail -n $start_line | head -n 3 | tail -n 1 ) $command_file
+else
+    cp $NIBABIES_SCAFFOLD_TXT $command_file
+fi
 nano $command_file
 if [[ ! -f $command_file ]]; then
     echo "ERROR: $command_file doesn't exist (this shouldn't happen)"
@@ -100,7 +124,9 @@ shell_command="${shell_command//[[:space:]]+/ }"
 echo "$shell_command"
 eval "$shell_command"
 
-d=$(date)
-echo $d >> $NIBABIES_SCAFFOLD_HISTORY
-printf "%$((${#d}))s\n" | tr ' ' '-' >> $NIBABIES_SCAFFOLD_HISTORY
-echo -e "$shell_command\n" >> $NIBABIES_SCAFFOLD_HISTORY
+if [[ ! -z "$shell_command" ]]; then
+    d=$(date)
+    echo $d >> $NIBABIES_SCAFFOLD_HISTORY
+    printf "%$((${#d}))s\n" | tr ' ' '-' >> $NIBABIES_SCAFFOLD_HISTORY
+    echo -e "$shell_command\n" >> $NIBABIES_SCAFFOLD_HISTORY
+fi
