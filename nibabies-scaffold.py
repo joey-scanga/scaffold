@@ -59,7 +59,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     megroup = parser.add_mutually_exclusive_group()
     megroup.add_argument("--history","--hist", 
-                        help="Display the 5 most recent Nibabies calls",
+                        help="Display the 5 most recent Nibabies calls, or n calls specified by --histlines",
                         action="store_true")
     megroup.add_argument("--long_history","--longhist", 
                         help="Display all Nibabies calls using the 'less' pager",
