@@ -300,6 +300,9 @@ def run_scaffold(text: str|None = None,
                .split(" ")
               )
         cmd = list(filter(None, cmd))
+        if len(cmd) == 0:
+            logger.error("No command found. Exiting...")
+            sys.exit(1)
         logger.info("Running command:\n\n%s\n", wrap_cmd_txt(" ".join(cmd)))
         timestamp = str(datetime.datetime.now())
         start = time.time()
