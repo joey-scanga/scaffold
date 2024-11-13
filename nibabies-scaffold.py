@@ -23,7 +23,8 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 DEFAULT_SCAFFOLD_TEXT = """\
-# Edit this boilerplate command to fit your needs, then save and quit.
+# Edit this file to fit your needs, then save and quit.
+#
 # To save this command as a template, make this first line
 # in this file, keeping the hash in front as well as the quotes around the
 # template name:
@@ -31,22 +32,10 @@ DEFAULT_SCAFFOLD_TEXT = """\
 # template_name="<template-name-here>"
 #
 # The template name can only contain letters, numbers, underscores, or hyphens.
+#
+# Below, write out the shell command you wish to save as a scaffold, without
+# hash characters in front. If it spans multiple lines, add a backslash '\\' at the end.
 
-docker run --rm -it \\
-    -v <rawdata-path-here>:/input:ro \\
-    -v <derivatives-path-here>:/output \\
-    -v /opt/FreeSurfer7.3/.license:/opt/freesurfer/license.txt \\
-    -v <optional-segmentation-output>:/derivatives \\
-    -v <work-dir>:/work \\
-    nipreps/nibabies:latest \\
-    -u $(id -u):$(id -g) \\
-    --fs-license-file /opt/freesurfer/license.txt \\
-    --derivatives /derivatives \\
-    --age-months <age-months> \\
-    --participant-label <participant-label> \\
-    --session-id <session-id> \\
-    --surface-recon-method mcribs \\
-    --cifti-output 91k
 """
 
 DEFAULT_CONFIG_SETTINGS = {
@@ -107,17 +96,17 @@ def get_parser():
     parser = argparse.ArgumentParser()
     megroup = parser.add_mutually_exclusive_group()
     megroup.add_argument("--history","--hist", 
-                        help="Display the 5 most recent Nibabies calls, or n calls specified by --histlines",
+                        help="Display the 5 most recent calls, or n calls specified by --histlines",
                         action="store_true")
     megroup.add_argument("--long_history","--longhist", 
-                        help="Display all Nibabies calls using the 'less' pager",
+                        help="Display all calls using the 'less' pager",
                         action="store_true")
     megroup.add_argument("--clear_history",
                         help="Clears the history file.",
                         action="store_true")
     megroup.add_argument("--edit_previous_run","-e", 
                          help=dedent("""
-                         Use a previous Nibabies run as an editable scaffold by specifying
+                         Use a previous run as an editable scaffold by specifying
                          a run number. You can get the run number by running with the
                          --hist option.
                          """),
@@ -140,7 +129,7 @@ def get_parser():
     parser.add_argument("--template", "-t",
                          help="Choose a template scaffold by name.",
                          type=str,
-                         default="nibabies")
+                         default="default")
     return parser
 
 def is_valid_json(filepath):
@@ -162,8 +151,12 @@ def get_paths():
     if not os.path.isdir(templates):
         logger.info("templates directory not found, creating at %s", templates)
         os.makedirs(templates, mode=0o777)
-        nibabies_template = os.path.join(templates, "nibabies.txt")
-        with open(nibabies_template, "w") as f:
+        default_template = os.path.join(templates, "default.txt")
+        with open(default_template, "w") as f:
+            f.write(DEFAULT_SCAFFOLD_TEXT)
+    if not os.path.isfile(default_template:=os.path.join(templates, "default.txt")):
+        logger.info("default template not found, creating at %s", default_template)
+        with open(default_template, "w") as f:
             f.write(DEFAULT_SCAFFOLD_TEXT)
     config = os.path.join(share, "config.json")
     if not os.path.isfile(config):
@@ -315,6 +308,7 @@ def run_scaffold(text: str|None = None,
         elapsed_time_seconds = end - start
         report = create_run_report_obj(" ".join(cmd),
                                        completed_process,
+                                       template,
                                        timestamp,
                                        elapsed_time_seconds)
         if completed_process.returncode != 0:
@@ -328,6 +322,7 @@ def run_scaffold(text: str|None = None,
 
 def create_run_report_obj(cmd_string: str,
                           completed_process: subprocess.CompletedProcess,
+                          template: str,
                           timestamp: str,
                           elapsed_time_seconds: float):
     report = {}
@@ -338,6 +333,7 @@ def create_run_report_obj(cmd_string: str,
     report["success"] = str(completed_process.returncode == 0)
     report["timestamp"] = timestamp
     report["elapsed_time_seconds"] = elapsed_time_seconds
+    report["template_used"] = template if template else "None"
     return report
         
 
