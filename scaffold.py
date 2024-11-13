@@ -111,9 +111,11 @@ def get_parser():
                          --hist option.
                          """),
                          type=int)
-    megroup.add_argument("--list_templates",
+    megroup.add_argument("--list_templates", "-ls",
                          help="List all templates you have defined.",
                          action='store_true')
+    megroup.add_argument("--display_template",
+                         help="Display the contents of a given template.")
     megroup.add_argument("--edit_config",
                          help="Opens a text editor on your config file (USE AT YOUR OWN RISK!)",
                          action='store_true')
@@ -126,6 +128,16 @@ def get_parser():
                          type=str,
                          default="default")
     return parser
+
+
+def display_template(template: str):
+    paths = get_paths()
+    if os.path.isfile(template_path:=os.path.join(paths["templates"], f"{template}.txt")):
+        subprocess.run(["less", "+G", template_path], check=True)
+    else:
+        logger.error("Specified template \"%s\" doesn't exist. Exiting...", template)
+        sys.exit(1)
+
 
 def is_valid_json(filepath):
     try:
@@ -376,6 +388,8 @@ def main():
         list_templates()
     elif args.edit_config:
         edit_config()
+    elif args.display_template:
+        display_template(args.display_template)
     else:
         run_scaffold(template=args.template)
 
