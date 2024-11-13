@@ -80,7 +80,7 @@ def get_parser():
                          default=1
                          )
     parser.add_argument("--histlines",
-                        help="Specify the number of lines to print out with the --hist command.",
+                        help="Specify the number of lines to print out with the --hist command. (default is 5)",
                         type=int,
                         default=5)
     return parser
