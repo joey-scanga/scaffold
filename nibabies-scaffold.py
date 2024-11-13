@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
+from glob import glob
 from textwrap import dedent, wrap
-import datetime
-import time
 import argparse
+import datetime
 import json
 import logging
 import os
@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -60,17 +61,39 @@ def wrap_cmd_txt(cmd_text):
 
 
 def save_template(cmd_lines):
-    if template_name := re.match(r'^#\s*template_name\s*=\s*\"([\w\-_\d]+)\"', cmd_lines[0]).group(1):
+    if template_match := re.match(r'^#\s*template_name\s*=\s*\"([\w\-_\d]+)\"', cmd_lines[0]):
+        try:
+            template_name = template_match.group(1)
+        except AttributeError:
+            logger.error("Invalid template name. Exiting...")
+            sys.exit(1)
         paths = get_paths()
         template_path = os.path.join(paths["templates"], f"{template_name}.txt")
         template_path_exists = os.path.exists(template_path)
+        i = 0
+        new_template_path = None
+        while template_path_exists:
+            new_template_path = re.sub(r'\.txt$', '', template_path) + f"_template_{i}.txt"
+            template_path_exists = os.path.exists(new_template_path)
+        if new_template_path:
+            template_path = new_template_path
         logger.info("Saving template to %s", template_path)
         # TODO: prevent colliding file names
         with open(template_path, "w", encoding='utf-8') as f:
             f.writelines(cmd_lines[1:])
     else:
-        logger.warning("Will not be saved as a template.")
+        logger.debug("Will not be saved as a template.")
         # paths = get_paths()
+
+
+def list_templates():
+    paths = get_paths()
+    template_paths = [os.path.basename(p) for p in glob(f"{paths['templates']}/*.txt")]
+    template_names = [re.sub(r'\.txt', '', p) for p in template_paths]
+    for name in template_names:
+        print(name)
+        print('-' * len(name))
+        print('\n' + get_template_text(name) + '\n')
 
 
 def get_parser():
@@ -100,6 +123,9 @@ def get_parser():
                          type=int,
                          default=1
                          )
+    megroup.add_argument("--list_templates",
+                         help="List all templates you have defined.",
+                         action='store_true')
     parser.add_argument("--histlines",
                         help="Specify the number of lines to print out with the --hist command. (default is 5)",
                         type=int,
@@ -150,6 +176,7 @@ def get_paths():
             "share": share,
             "history": history,
             "state": state,
+            "templates": templates,
             }
     return paths
 
@@ -177,6 +204,17 @@ def get_lines_to_print(runs):
             lines.append("\n")
     lines_to_print = [str.encode(l) for l in lines]
     return lines_to_print
+
+
+def get_template_text(template_name: str):
+    paths = get_paths()
+    template_file_path = os.path.join(paths["templates"], f"{template_name}.txt")
+    if not os.path.isfile(template_file_path):
+        logger.error("Specified template %s does not exist.", template_name)
+        logger.error("(It should exist at %s)", template_file_path)
+    with open(template_file_path, encoding='utf-8') as f:
+        text = f.read()
+    return text
  
 
 def run_history(histlines: int):
@@ -223,12 +261,12 @@ def run_scaffold(text: str|None = None,
                  template: str|None = None):
     paths = get_paths()
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        # TODO: actually grab text from template path
-        if text == None:
-            temp_file.write(str.encode(template))
-        elif text == None and template == None:
+        if text == None and template == None:
             logger.error("No template specified. Exiting...")
             sys.exit(1)
+        elif text == None:
+            template_text = get_template_text(template)
+            temp_file.write(str.encode(template_text))
         else:
             temp_file.write(str.encode(text))
         temp_file.flush()
@@ -288,6 +326,8 @@ def main():
         run_clear_history()
     elif args.edit_previous_run:
         run_edit_previous_run(args.edit_previous_run)
+    elif args.list_templates:
+        list_templates()
     else:
         run_scaffold(template=args.template)
 
