@@ -140,7 +140,7 @@ def get_lines_to_print(runs):
     for idx, run in enumerate(runs):
         lines.append(f"{len(runs) - idx}) {run['timestamp']}\n") 
         lines.append('-' * len(lines[-1]) + '\n') # Print underline to above line
-        lines.append(f"{run['cmd']}\n")
+        lines.append(f"{wrap_cmd_txt(run['cmd'])}\n")
         if (idx + 1) != len(runs):
             lines.append("\n")
     lines_to_print = [str.encode(l) for l in lines]
