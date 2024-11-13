@@ -49,6 +49,10 @@ docker run --rm -it \\
     --cifti-output 91k
 """
 
+DEFAULT_CONFIG_SETTINGS = {
+        "editor": "nano",
+}
+
 def wrap_cmd_txt(cmd_text):
     wrapped_txt_lines = wrap(cmd_text,
                              subsequent_indent='\t',
@@ -126,6 +130,9 @@ def get_parser():
     megroup.add_argument("--list_templates",
                          help="List all templates you have defined.",
                          action='store_true')
+    megroup.add_argument("--edit_config",
+                         help="Opens a text editor on your config file (USE AT YOUR OWN RISK!)",
+                         action='store_true')
     parser.add_argument("--histlines",
                         help="Specify the number of lines to print out with the --hist command. (default is 5)",
                         type=int,
@@ -158,6 +165,11 @@ def get_paths():
         nibabies_template = os.path.join(templates, "nibabies.txt")
         with open(nibabies_template, "w") as f:
             f.write(DEFAULT_SCAFFOLD_TEXT)
+    config = os.path.join(share, "config.json")
+    if not os.path.isfile(config):
+        logger.info("config file not found, creating at %s", config)
+        with open(config, 'w', encoding='utf-8') as f:
+            json.dump(DEFAULT_CONFIG_SETTINGS, f, ensure_ascii=False, indent=4)
     history=os.path.join(share, "history.json")
     if not os.path.isfile(history):
         logger.info("creating history file at %s", history)
@@ -177,8 +189,21 @@ def get_paths():
             "history": history,
             "state": state,
             "templates": templates,
+            "config": config
             }
     return paths
+
+
+def get_config(paths):
+    with open(paths["config"], encoding='utf-8') as f:
+        config = json.load(f)
+    return config
+
+
+def edit_config():
+    paths = get_paths()
+    config = get_config(paths)
+    subprocess.run([config["editor"], paths["config"]], check=True)
 
 
 def open_less_on_tempfile(lines_to_print):
@@ -260,6 +285,7 @@ def run_edit_previous_run(run_num: int):
 def run_scaffold(text: str|None = None,
                  template: str|None = None):
     paths = get_paths()
+    config = get_config(paths)
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         if text == None and template == None:
             logger.error("No template specified. Exiting...")
@@ -270,7 +296,7 @@ def run_scaffold(text: str|None = None,
         else:
             temp_file.write(str.encode(text))
         temp_file.flush()
-        subprocess.run(["nano", temp_file.name], check=True)
+        subprocess.run([config["editor"], temp_file.name], check=True)
         with open(temp_file.name, encoding='utf-8') as f:
             lines = f.readlines()
         save_template(lines)
@@ -328,6 +354,8 @@ def main():
         run_edit_previous_run(args.edit_previous_run)
     elif args.list_templates:
         list_templates()
+    elif args.edit_config:
+        edit_config()
     else:
         run_scaffold(template=args.template)
 
