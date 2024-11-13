@@ -22,8 +22,14 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
 DEFAULT_SCAFFOLD_TEXT = """\
-# Edit this boilerplate command to fit
-# your needs, then save and quit.
+# Edit this boilerplate command to fit your needs, then save and quit.
+# To save this command as a template, make this first line
+# in this file, keeping the hash in front as well as the quotes around the
+# template name:
+#
+# template_name="<template-name-here>"
+#
+# The template name can only contain letters, numbers, underscores, or hyphens.
 
 docker run --rm -it \\
     -v <rawdata-path-here>:/input:ro \\
@@ -51,6 +57,21 @@ def wrap_cmd_txt(cmd_text):
     wrapped_txt_lines = [f"{l} \\" for l in wrapped_txt_lines]
     wrapped_txt = "\n".join(wrapped_txt_lines)
     return wrapped_txt
+
+
+def save_template(cmd_lines):
+    if template_name := re.match(r'^#\s*template_name\s*=\s*\"([\w\-_\d]+)\"', cmd_lines[0]).group(1):
+        paths = get_paths()
+        template_path = os.path.join(paths["templates"], f"{template_name}.txt")
+        template_path_exists = os.path.exists(template_path)
+        logger.info("Saving template to %s", template_path)
+        # TODO: prevent colliding file names
+        with open(template_path, "w", encoding='utf-8') as f:
+            f.writelines(cmd_lines[1:])
+    else:
+        logger.warning("Will not be saved as a template.")
+        # paths = get_paths()
+
 
 def get_parser():
     """
@@ -83,6 +104,10 @@ def get_parser():
                         help="Specify the number of lines to print out with the --hist command. (default is 5)",
                         type=int,
                         default=5)
+    parser.add_argument("--template", "-t",
+                         help="Choose a template scaffold by name.",
+                         type=str,
+                         default="nibabies")
     return parser
 
 def is_valid_json(filepath):
@@ -100,6 +125,13 @@ def get_paths():
     if not os.path.isdir(share):
         logger.info("share directory not found, creating at %s", share)
         os.makedirs(share, mode=0o777)
+    templates = os.path.join(share, "templates")
+    if not os.path.isdir(templates):
+        logger.info("templates directory not found, creating at %s", templates)
+        os.makedirs(templates, mode=0o777)
+        nibabies_template = os.path.join(templates, "nibabies.txt")
+        with open(nibabies_template, "w") as f:
+            f.write(DEFAULT_SCAFFOLD_TEXT)
     history=os.path.join(share, "history.json")
     if not os.path.isfile(history):
         logger.info("creating history file at %s", history)
@@ -187,17 +219,23 @@ def run_edit_previous_run(run_num: int):
     run_scaffold(wrap_cmd_txt(run["cmd"]))
     
         
-def run_scaffold(text: str|None = None):
+def run_scaffold(text: str|None = None,
+                 template: str|None = None):
     paths = get_paths()
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        # TODO: actually grab text from template path
         if text == None:
-            temp_file.write(str.encode(DEFAULT_SCAFFOLD_TEXT))
+            temp_file.write(str.encode(template))
+        elif text == None and template == None:
+            logger.error("No template specified. Exiting...")
+            sys.exit(1)
         else:
             temp_file.write(str.encode(text))
         temp_file.flush()
         subprocess.run(["nano", temp_file.name], check=True)
         with open(temp_file.name, encoding='utf-8') as f:
             lines = f.readlines()
+        save_template(lines)
         lines = [re.sub(r'(\n|\\)$', '', l) for l in lines if not re.match(r'\s*#', l) and not re.match(r'^\s*\n?$', l)]
         lines = [re.sub(r'\s+', ' ', l) for l in lines]
         cmd = (" "
@@ -251,7 +289,7 @@ def main():
     elif args.edit_previous_run:
         run_edit_previous_run(args.edit_previous_run)
     else:
-        run_scaffold()
+        run_scaffold(template=args.template)
 
 if __name__ == "__main__":
     main()
