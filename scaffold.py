@@ -333,7 +333,7 @@ def run_scaffold(text: str|None = None,
         logger.info("Running command:\n\n%s\n", wrap_cmd_txt(" ".join(cmd)))
         timestamp = str(datetime.datetime.now())
         start = time.time()
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(" ".join(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         stdout_text, stderr_text = capture_and_print_process_output(process)
         end = time.time()
         elapsed_time_seconds = end - start
