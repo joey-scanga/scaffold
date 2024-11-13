@@ -1,5 +1,0 @@
-add -r/--rerun [idx] option
-
-add the rest of nibabies options in the editable txt
-
-
