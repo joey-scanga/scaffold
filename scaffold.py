@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from glob import glob
 from textwrap import dedent, wrap
+import threading
 import argparse
 import datetime
 import json
@@ -49,6 +50,7 @@ def wrap_cmd_txt(cmd_text):
                              break_on_hyphens=False,
                              tabsize=4,)
     wrapped_txt_lines = [f"{l} \\" for l in wrapped_txt_lines]
+    wrapped_txt_lines[-1] = re.sub(r'\\', '', wrapped_txt_lines[-1])
     wrapped_txt = "\n".join(wrapped_txt_lines)
     return wrapped_txt
 
@@ -85,8 +87,6 @@ def list_templates():
     template_names = [re.sub(r'\.txt', '', p) for p in template_paths]
     for name in template_names:
         print(name)
-        print('-' * len(name))
-        print('\n' + get_template_text(name) + '\n')
 
 
 def get_parser():
@@ -275,6 +275,26 @@ def run_edit_previous_run(run_num: int):
     run_scaffold(wrap_cmd_txt(run["cmd"]))
 
 
+def capture_and_print_process_output(process):
+    def print_and_capture_output(pipe, output_list):
+        for line in iter(pipe.readline, b''):
+            decoded_line = line.decode('utf-8')
+            print(decoded_line, end='')
+            output_list.append(decoded_line)
+        pipe.close()
+    stdout_output, stderr_output = [], []
+    stdout_thread = threading.Thread(target=print_and_capture_output, args=(process.stdout, stdout_output))
+    stderr_thread = threading.Thread(target=print_and_capture_output, args=(process.stderr, stderr_output))
+    stdout_thread.start()
+    stderr_thread.start()
+    stdout_thread.join()
+    stderr_thread.join()
+    process.wait()
+    stdout_text = ''.join(stdout_output)
+    stderr_text = ''.join(stderr_output)
+    return (stdout_text, stderr_text)
+
+
 def run_scaffold(text: str|None = None,
                  template: str|None = None):
     paths = get_paths()
@@ -306,16 +326,20 @@ def run_scaffold(text: str|None = None,
         logger.info("Running command:\n\n%s\n", wrap_cmd_txt(" ".join(cmd)))
         timestamp = str(datetime.datetime.now())
         start = time.time()
-        completed_process = subprocess.run(cmd, capture_output=True, text=True)
+        # completed_process = subprocess.run(cmd, capture_output=True, text=True)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout_text, stderr_text = capture_and_print_process_output(process)
         end = time.time()
         elapsed_time_seconds = end - start
-        report = create_run_report_obj(" ".join(cmd),
-                                       completed_process,
+        report = create_run_report_obj(" ".join(cmd).split("\\")[0],
+                                       process,
+                                       stdout_text,
+                                       stderr_text,
                                        template,
                                        timestamp,
                                        elapsed_time_seconds)
-        if completed_process.returncode != 0:
-            logger.error("Process exited with return code %d", completed_process.returncode)
+        if process.returncode != 0:
+            logger.error("Process exited with return code %d", process.returncode)
         with open(paths["history"], 'r') as f:
             data = json.load(f)
         data["history"].append(report)
@@ -325,14 +349,16 @@ def run_scaffold(text: str|None = None,
 
 def create_run_report_obj(cmd_string: str,
                           completed_process: subprocess.CompletedProcess,
+                          stdout_text: str,
+                          stderr_text: str,
                           template: str,
                           timestamp: str,
                           elapsed_time_seconds: float):
     report = {}
     report["cmd"] = cmd_string
     report["returncode"] = completed_process.returncode
-    report["stdout"] = str(completed_process.stdout)
-    report["stderr"] = str(completed_process.stderr)
+    report["stdout"] = str(stdout_text)
+    report["stderr"] = str(stderr_text)
     report["success"] = str(completed_process.returncode == 0)
     report["timestamp"] = timestamp
     report["elapsed_time_seconds"] = elapsed_time_seconds
