@@ -95,16 +95,16 @@ def get_parser():
     """
     parser = argparse.ArgumentParser()
     megroup = parser.add_mutually_exclusive_group()
-    megroup.add_argument("--history","--hist", 
+    megroup.add_argument("--history","--hist",
                         help="Display the 5 most recent calls, or n calls specified by --histlines",
                         action="store_true")
-    megroup.add_argument("--long_history","--longhist", 
+    megroup.add_argument("--long_history","--longhist",
                         help="Display all calls using the 'less' pager",
                         action="store_true")
     megroup.add_argument("--clear_history",
                         help="Clears the history file.",
                         action="store_true")
-    megroup.add_argument("--edit_previous_run","-e", 
+    megroup.add_argument("--edit_previous_run","-e",
                          help=dedent("""
                          Use a previous run as an editable scaffold by specifying
                          a run number. You can get the run number by running with the
@@ -215,7 +215,7 @@ def open_less_on_tempfile(lines_to_print):
 def get_lines_to_print(runs):
     lines = []
     for idx, run in enumerate(runs):
-        lines.append(f"{len(runs) - idx}) {run['timestamp']}\n") 
+        lines.append(f"{len(runs) - idx}) {run['timestamp']}\n")
         lines.append('-' * len(lines[-1]) + '\n') # Print underline to above line
         lines.append(f"{wrap_cmd_txt(run['cmd'])}\n")
         if (idx + 1) != len(runs):
@@ -233,7 +233,7 @@ def get_template_text(template_name: str):
     with open(template_file_path, encoding='utf-8') as f:
         text = f.read()
     return text
- 
+
 
 def run_history(histlines: int):
     paths = get_paths()
@@ -241,7 +241,7 @@ def run_history(histlines: int):
         history_dict = json.load(f)
     runs = history_dict["history"]
     if histlines <= len(runs):
-        runs = runs[len(runs) - histlines:]  
+        runs = runs[len(runs) - histlines:]
     lines_to_print = get_lines_to_print(runs)
     open_less_on_tempfile(lines_to_print)
 
@@ -273,8 +273,8 @@ def run_edit_previous_run(run_num: int):
         logger.error("Index %d out of bounds", index_of_run)
         sys.exit(1)
     run_scaffold(wrap_cmd_txt(run["cmd"]))
-    
-        
+
+
 def run_scaffold(text: str|None = None,
                  template: str|None = None):
     paths = get_paths()
@@ -335,12 +335,12 @@ def create_run_report_obj(cmd_string: str,
     report["elapsed_time_seconds"] = elapsed_time_seconds
     report["template_used"] = template if template else "None"
     return report
-        
+
 
 def main():
     parser = get_parser()
     args = parser.parse_args()
-    if args.history: 
+    if args.history:
         run_history(args.histlines)
     elif args.long_history:
         run_long_history()
