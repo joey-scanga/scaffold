@@ -1,12 +1,11 @@
+#!/usr/bin/env python3
 from textwrap import dedent, wrap
 import datetime
 import time
 import argparse
 import json
 import logging
-import math
 import os
-import pathlib
 import re
 import subprocess
 import sys
