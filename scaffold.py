@@ -111,11 +111,6 @@ def get_parser():
                          --hist option.
                          """),
                          type=int)
-    megroup.add_argument("--textwrap",
-                         help="testing textwrap, arg should be index of history run",
-                         type=int,
-                         default=1
-                         )
     megroup.add_argument("--list_templates",
                          help="List all templates you have defined.",
                          action='store_true')
