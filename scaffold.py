@@ -150,7 +150,7 @@ def is_valid_json(filepath):
 
 def get_paths():
     home=os.path.expanduser("~")
-    share=os.path.join(home, ".local/share/nibabies-scaffold")
+    share=os.path.join(home, ".local/share/scaffold")
     if not os.path.isdir(share):
         logger.info("share directory not found, creating at %s", share)
         os.makedirs(share, mode=0o777)
