@@ -179,7 +179,7 @@ def get_paths():
         logger.warning("history file corrupted, recreating at %s", history)
         with open(history, 'w', encoding='utf-8') as f:
             json.dump({"history": []}, f, ensure_ascii=False, indent=4)
-    state=os.path.join(home, ".local/state/nibabies-scaffold")
+    state=os.path.join(home, ".local/state/scaffold")
     if not os.path.isdir(state):
         logger.info("state directory not found, creating at %s", state)
         os.makedirs(state, mode=0o777)
