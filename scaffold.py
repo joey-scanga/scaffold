@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import sqlite3
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -62,8 +63,8 @@ def save_template(cmd_lines):
         except AttributeError:
             logger.error("Invalid template name. Exiting...")
             sys.exit(1)
-        paths = get_paths()
-        template_path = os.path.join(paths["templates"], f"{template_name}.txt")
+        env = get_environment()
+        template_path = os.path.join(env["templates"], f"{template_name}.txt")
         template_path_exists = os.path.exists(template_path)
         i = 0
         new_template_path = None
@@ -78,12 +79,12 @@ def save_template(cmd_lines):
             f.writelines(cmd_lines[1:])
     else:
         logger.debug("Will not be saved as a template.")
-        # paths = get_paths()
+        # env = get_environment()
 
 
 def list_templates():
-    paths = get_paths()
-    template_paths = [os.path.basename(p) for p in glob(f"{paths['templates']}/*.txt")]
+    env = get_environment()
+    template_paths = [os.path.basename(p) for p in glob(f"{env['templates']}/*.txt")]
     template_names = [re.sub(r'\.txt', '', p) for p in template_paths]
     for name in template_names:
         print(name)
@@ -131,8 +132,8 @@ def get_parser():
 
 
 def display_template(template: str):
-    paths = get_paths()
-    if os.path.isfile(template_path:=os.path.join(paths["templates"], f"{template}.txt")):
+    env = get_environment()
+    if os.path.isfile(template_path:=os.path.join(env["templates"], f"{template}.txt")):
         subprocess.run(["less", "+G", template_path], check=True)
     else:
         logger.error("Specified template \"%s\" doesn't exist. Exiting...", template)
@@ -148,7 +149,7 @@ def is_valid_json(filepath):
         return False
 
 
-def get_paths():
+def get_environment():
     home=os.path.expanduser("~")
     share=os.path.join(home, ".local/share/scaffold")
     if not os.path.isdir(share):
@@ -170,40 +171,41 @@ def get_paths():
         logger.info("config file not found, creating at %s", config)
         with open(config, 'w', encoding='utf-8') as f:
             json.dump(DEFAULT_CONFIG_SETTINGS, f, ensure_ascii=False, indent=4)
-    history=os.path.join(share, "history.json")
-    if not os.path.isfile(history):
-        logger.info("creating history file at %s", history)
-        with open(history, 'w', encoding='utf-8') as f:
-            json.dump({"history": []}, f, ensure_ascii=False, indent=4)
-    elif not is_valid_json(history):
-        logger.warning("history file corrupted, recreating at %s", history)
-        with open(history, 'w', encoding='utf-8') as f:
-            json.dump({"history": []}, f, ensure_ascii=False, indent=4)
     state=os.path.join(home, ".local/state/scaffold")
     if not os.path.isdir(state):
         logger.info("state directory not found, creating at %s", state)
         os.makedirs(state, mode=0o777)
-    paths = {
+    history_db = os.path.join(share, "history.db")
+    conn = sqlite3.connect(history_db)
+    cur = conn.cursor()
+    query = """SELECT name FROM sqlite_master WHERE type='table' AND name='history'"""
+    cur.execute(query)
+    if len(cur.fetchall()) == 0: # Create history table if nonexistent
+        query = """CREATE TABLE history(cmd, returncode, stdout, stderr, success, timestamp, elapsed_time_seconnds, template_used)"""
+        cur.execute(query)
+        conn.commit()
+    conn.close()
+    env = {
             "home": home,
             "share": share,
-            "history": history,
             "state": state,
             "templates": templates,
+            "history_db": history_db,
             "config": config
             }
-    return paths
+    return env
 
 
-def get_config(paths):
-    with open(paths["config"], encoding='utf-8') as f:
+def get_config(env):
+    with open(env["config"], encoding='utf-8') as f:
         config = json.load(f)
     return config
 
 
 def edit_config():
-    paths = get_paths()
-    config = get_config(paths)
-    subprocess.run([config["editor"], paths["config"]], check=True)
+    env = get_environment()
+    config = get_config(env)
+    subprocess.run([config["editor"], env["config"]], check=True)
 
 
 def open_less_on_tempfile(lines_to_print):
@@ -232,8 +234,8 @@ def get_lines_to_print(runs):
 
 
 def get_template_text(template_name: str):
-    paths = get_paths()
-    template_file_path = os.path.join(paths["templates"], f"{template_name}.txt")
+    env = get_environment()
+    template_file_path = os.path.join(env["templates"], f"{template_name}.txt")
     if not os.path.isfile(template_file_path):
         logger.error("Specified template %s does not exist.", template_name)
         logger.error("(It should exist at %s)", template_file_path)
@@ -243,43 +245,47 @@ def get_template_text(template_name: str):
 
 
 def run_history(histlines: int):
-    paths = get_paths()
-    with open(paths["history"], encoding='utf-8') as f:
-        history_dict = json.load(f)
-    runs = history_dict["history"]
-    if histlines <= len(runs):
-        runs = runs[len(runs) - histlines:]
+    env = get_environment()
+    conn = sqlite3.connect(env["history_db"])
+    cur = conn.cursor()
+    runs = [{"cmd": cmd, "timestamp": timestamp}
+            for cmd, timestamp in cur.execute("SELECT cmd, timestamp FROM history ORDER BY ROWID ASC;").fetchmany(histlines)]
+    conn.close()
     lines_to_print = get_lines_to_print(runs)
     open_less_on_tempfile(lines_to_print)
 
 
 def run_long_history():
-    paths = get_paths()
-    with open(paths["history"], encoding='utf-8') as f:
-        history_dict = json.load(f)
-    runs = history_dict["history"]
+    env = get_environment()
+    conn = sqlite3.connect(env["history_db"])
+    cur = conn.cursor()
+    runs = [{"cmd": cmd, "timestamp": timestamp}
+            for cmd, timestamp in cur.execute("SELECT cmd, timestamp FROM history ORDER BY ROWID DESC;").fetchall()]
+    conn.close()
     lines_to_print = get_lines_to_print(runs)
     open_less_on_tempfile(lines_to_print)
 
 
 def run_clear_history():
-    paths = get_paths()
-    with open(paths["history"], "w", encoding='utf-8'):
-        pass # Opening in write-mode will clear the file
+    env = get_environment()
+    conn = sqlite3.connect(env["history_db"])
+    cur = conn.cursor()
+    cur.execute("DELETE FROM history;")
+    conn.commit()
+    conn.close()
 
 
 def run_edit_previous_run(run_num: int):
-    paths = get_paths()
-    with open(paths["history"], encoding='utf-8') as f:
-        history_dict = json.load(f)
-    runs = history_dict["history"]
-    index_of_run = len(runs) - run_num
-    try:
-        run = runs[index_of_run]
-    except IndexError:
-        logger.error("Index %d out of bounds", index_of_run)
-        sys.exit(1)
-    run_scaffold(wrap_cmd_txt(run["cmd"]))
+    env = get_environment()
+    conn = sqlite3.connect(env["history_db"])
+    cur = conn.cursor()
+    cmd_str = (
+        cur
+        .execute("SELECT cmd FROM history ORDER BY ROWID DESC")
+        .fetchmany(run_num)[-1][0]
+    )
+    conn.close()
+    run_scaffold(wrap_cmd_txt(cmd_str))
 
 
 def capture_and_print_process_output(process):
@@ -304,8 +310,8 @@ def capture_and_print_process_output(process):
 
 def run_scaffold(text: str|None = None,
                  template: str|None = None):
-    paths = get_paths()
-    config = get_config(paths)
+    env = get_environment()
+    config = get_config(env)
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         if text == None and template == None:
             logger.error("No template specified. Exiting...")
@@ -337,39 +343,61 @@ def run_scaffold(text: str|None = None,
         stdout_text, stderr_text = capture_and_print_process_output(process)
         end = time.time()
         elapsed_time_seconds = end - start
-        report = create_run_report_obj(" ".join(cmd).split("\\")[0],
-                                       process,
-                                       stdout_text,
-                                       stderr_text,
-                                       template,
-                                       timestamp,
-                                       elapsed_time_seconds)
+        insert_run_into_db(" ".join(cmd).split("\\")[0],
+                           process,
+                           stdout_text,
+                           stderr_text,
+                           template,
+                           timestamp,
+                           elapsed_time_seconds)
         if process.returncode != 0:
             logger.error("Process exited with return code %d", process.returncode)
-        with open(paths["history"], 'r') as f:
-            data = json.load(f)
-        data["history"].append(report)
-        with open(paths["history"], 'w') as f:
-            json.dump(data, f, indent=4)
 
 
-def create_run_report_obj(cmd_string: str,
-                          completed_process: subprocess.CompletedProcess,
-                          stdout_text: str,
-                          stderr_text: str,
-                          template: str,
-                          timestamp: str,
-                          elapsed_time_seconds: float):
-    report = {}
-    report["cmd"] = cmd_string
-    report["returncode"] = completed_process.returncode
-    report["stdout"] = str(stdout_text)
-    report["stderr"] = str(stderr_text)
-    report["success"] = str(completed_process.returncode == 0)
-    report["timestamp"] = timestamp
-    report["elapsed_time_seconds"] = elapsed_time_seconds
-    report["template_used"] = template if template else "None"
-    return report
+def insert_run_into_db(cmd_string: str,
+                       completed_process: subprocess.CompletedProcess,
+                       stdout_text: str,
+                       stderr_text: str,
+                       template: str,
+                       timestamp: str,
+                       elapsed_time_seconds: float):
+    env = get_environment()
+    try:
+        conn = sqlite3.connect(env["history_db"])
+        cur = conn.cursor()
+        report = {}
+        report["cmd"] = cmd_string
+        report["returncode"] = completed_process.returncode
+        report["stdout"] = str(stdout_text)
+        report["stderr"] = str(stderr_text)
+        report["success"] = str(completed_process.returncode == 0)
+        report["timestamp"] = timestamp
+        report["elapsed_time_seconds"] = elapsed_time_seconds
+        report["template_used"] = template if template else "None"
+        query = """
+        INSERT INTO history (cmd,
+                             returncode,
+                             stdout,
+                             stderr,
+                             success,
+                             timestamp,
+                             elapsed_time_seconds,
+                             template_used)
+        VALUES(:cmd,
+               :returncode,
+               :stdout,
+               :stderr,
+               :success,
+               :timestamp,
+               :elapsed_time_seconds,
+               :template_used)
+        """
+        cur.execute(query, report)
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        print(e)
+        sys.exit(1)
 
 
 def main():
