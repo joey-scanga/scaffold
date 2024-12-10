@@ -248,8 +248,8 @@ def run_history(histlines: int):
     env = get_environment()
     conn = sqlite3.connect(env["history_db"])
     cur = conn.cursor()
-    runs = [{"cmd": cmd, "timestamp": timestamp}
-            for cmd, timestamp in cur.execute("SELECT cmd, timestamp FROM history ORDER BY ROWID ASC;").fetchmany(histlines)]
+    runs = list(reversed([{"cmd": cmd, "timestamp": timestamp}
+            for cmd, timestamp in cur.execute("SELECT cmd, timestamp FROM history ORDER BY timestamp DESC;").fetchmany(histlines)]))
     conn.close()
     lines_to_print = get_lines_to_print(runs)
     open_less_on_tempfile(lines_to_print)
@@ -259,8 +259,8 @@ def run_long_history():
     env = get_environment()
     conn = sqlite3.connect(env["history_db"])
     cur = conn.cursor()
-    runs = [{"cmd": cmd, "timestamp": timestamp}
-            for cmd, timestamp in cur.execute("SELECT cmd, timestamp FROM history ORDER BY ROWID DESC;").fetchall()]
+    runs = list(reversed([{"cmd": cmd, "timestamp": timestamp}
+            for cmd, timestamp in cur.execute("SELECT cmd, timestamp FROM history ORDER BY timestamp DESC;").fetchall()]))
     conn.close()
     lines_to_print = get_lines_to_print(runs)
     open_less_on_tempfile(lines_to_print)
