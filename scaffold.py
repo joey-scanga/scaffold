@@ -74,7 +74,6 @@ def save_template(cmd_lines):
         if new_template_path:
             template_path = new_template_path
         logger.info("Saving template to %s", template_path)
-        # TODO: prevent colliding file names
         with open(template_path, "w", encoding='utf-8') as f:
             f.writelines(cmd_lines[1:])
     else:
@@ -98,9 +97,6 @@ def get_parser():
     megroup = parser.add_mutually_exclusive_group()
     megroup.add_argument("--history","--hist",
                         help="Display the 5 most recent calls, or n calls specified by --histlines",
-                        action="store_true")
-    megroup.add_argument("--long_history","--longhist",
-                        help="Display all calls using the 'less' pager",
                         action="store_true")
     megroup.add_argument("--clear_history",
                         help="Clears the history file.",
@@ -142,7 +138,7 @@ def display_template(template: str):
 
 def is_valid_json(filepath):
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             json.load(f)
         return True
     except ValueError:
@@ -160,11 +156,11 @@ def get_environment():
         logger.info("templates directory not found, creating at %s", templates)
         os.makedirs(templates, mode=0o777)
         default_template = os.path.join(templates, "default.txt")
-        with open(default_template, "w") as f:
+        with open(default_template, "w", encoding='utf-8') as f:
             f.write(DEFAULT_SCAFFOLD_TEXT)
     if not os.path.isfile(default_template:=os.path.join(templates, "default.txt")):
         logger.info("default template not found, creating at %s", default_template)
-        with open(default_template, "w") as f:
+        with open(default_template, "w", encoding='utf-8') as f:
             f.write(DEFAULT_SCAFFOLD_TEXT)
     config = os.path.join(share, "config.json")
     if not os.path.isfile(config):
@@ -244,18 +240,7 @@ def get_template_text(template_name: str):
     return text
 
 
-def run_history(histlines: int):
-    env = get_environment()
-    conn = sqlite3.connect(env["history_db"])
-    cur = conn.cursor()
-    runs = list(reversed([{"cmd": cmd, "timestamp": timestamp}
-            for cmd, timestamp in cur.execute("SELECT cmd, timestamp FROM history ORDER BY timestamp DESC;").fetchmany(histlines)]))
-    conn.close()
-    lines_to_print = get_lines_to_print(runs)
-    open_less_on_tempfile(lines_to_print)
-
-
-def run_long_history():
+def run_history():
     env = get_environment()
     conn = sqlite3.connect(env["history_db"])
     cur = conn.cursor()
@@ -281,7 +266,7 @@ def run_edit_previous_run(run_num: int):
     cur = conn.cursor()
     cmd_str = (
         cur
-        .execute("SELECT cmd FROM history ORDER BY ROWID DESC")
+        .execute("SELECT cmd FROM history ORDER BY timestamp DESC")
         .fetchmany(run_num)[-1][0]
     )
     conn.close()
@@ -404,9 +389,7 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
     if args.history:
-        run_history(args.histlines)
-    elif args.long_history:
-        run_long_history()
+        run_history()
     elif args.clear_history:
         run_clear_history()
     elif args.edit_previous_run:
