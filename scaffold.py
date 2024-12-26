@@ -71,7 +71,6 @@ def save_template(cmd_lines):
         env = get_environment()
         template_path = os.path.join(env["templates"], f"{template_name}.txt")
         # TODO: add a config option to allow for this incremental template creation if one exists already
-        # template_path_exists = os.path.exists(template_path)
         # i = 0
         # new_template_path = None
         # while template_path_exists:
@@ -79,7 +78,10 @@ def save_template(cmd_lines):
             # template_path_exists = os.path.exists(new_template_path)
         # if new_template_path:
             # template_path = new_template_path
-        logger.info("Saving template to %s", template_path)
+        if os.path.exists(template_path):
+            logger.info("Overriding template %s", template_path)
+        else:
+            logger.info("Saving template to %s", template_path)
         with open(template_path, "w", encoding='utf-8') as f:
             f.writelines(cmd_lines[1:])
     else:
