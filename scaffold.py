@@ -55,6 +55,11 @@ def wrap_cmd_txt(cmd_text):
     wrapped_txt = "\n".join(wrapped_txt_lines)
     return wrapped_txt
 
+def delete_template(template_name):
+    env = get_environment()
+    template_path = os.path.join(env["templates"], f"{template_name}.txt")
+    os.remove(template_path)
+    logger.info(f"Removed template {template_name}.")
 
 def save_template(cmd_lines):
     if template_match := re.match(r'^#\s*template_name\s*=\s*\"([\w\-_\d]+)\"', cmd_lines[0]):
@@ -125,6 +130,9 @@ def get_parser():
                          help="Choose a template scaffold by name.",
                          type=str,
                          default="default")
+    parser.add_argument("--delete_template", "-dt",
+                         help="Choose a template scaffold by name.",
+                         type=str)
     return parser
 
 
@@ -401,6 +409,8 @@ def main():
         edit_config()
     elif args.display_template:
         display_template(args.display_template)
+    elif args.delete_template:
+        delete_template(args.delete_template)
     else:
         run_scaffold(template=args.template)
 
